@@ -80,7 +80,10 @@ sendfd(int sockfd, int fd)
 }
 
 void cleanup(int signal) {
+    std::cout << "Cleanup..." << std::endl;
     unlink("/tmp/charge_wrapper/charge_wrapper.sock");
+
+    exit(0);
 }
 
 int main(int argc, char** argv) {
@@ -89,6 +92,7 @@ int main(int argc, char** argv) {
     signal(SIGTERM, cleanup);
     signal(SIGKILL, cleanup);
     signal(SIGABRT, cleanup);
+    signal(SIGINT, cleanup);
 
     for(int i = 0; i < argc; i++) {
         std::cout << argv[i] << std::endl;
