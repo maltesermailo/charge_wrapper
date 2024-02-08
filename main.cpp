@@ -9,6 +9,8 @@
 #include <linux/seccomp.h>
 #include <sys/prctl.h>
 #include <unistd.h>
+#include <filesystem>
+#include <signal.h>
 
 #define X32_SYSCALL_BIT         0x40000000
 #define X86_64_CHECK_ARCH_AND_LOAD_SYSCALL_NR \
@@ -77,8 +79,16 @@ sendfd(int sockfd, int fd)
     return 0;
 }
 
+void cleanup(int signal) {
+    unlink("/tmp/charge_wrapper/charge_wrapper.sock");
+}
+
 int main(int argc, char** argv) {
     std::cout << "Starting wrapper!" << std::endl;
+
+    signal(SIGTERM, cleanup);
+    signal(SIGKILL, cleanup);
+    signal(SIGABRT, cleanup);
 
     for(int i = 0; i < argc; i++) {
         std::cout << argv[i] << std::endl;
@@ -94,7 +104,9 @@ int main(int argc, char** argv) {
     sockaddr_un sockaddr;
 
     sockaddr.sun_family = AF_UNIX;
-    strncpy(sockaddr.sun_path, "/run/charge_wrapper/charge_wrapper.sock", sizeof(sockaddr.sun_path) - 1);
+    strncpy(sockaddr.sun_path, "/tmp/charge_wrapper/charge_wrapper.sock", sizeof(sockaddr.sun_path) - 1);
+
+    std::filesystem::create_directories("/tmp/charge_wrapper/");
 
     int ret = bind(sockfd, reinterpret_cast<const struct sockaddr *>(&sockaddr), sizeof(sockaddr_un));
 
@@ -146,6 +158,8 @@ int main(int argc, char** argv) {
 
         std::cout << "Sending notify descriptor to supervisor" << std::endl;
 
+        sleep(10);
+
         //Send file descriptor
         sendfd(sockfd, notifyFd);
 
@@ -163,7 +177,7 @@ int main(int argc, char** argv) {
         //Close all open resoureces before executing new program.
         close(notifyFd);
         close(sockfd);
-        unlink("/run/charge_wrapper/charge_wrapper.sock");
+        unlink("/tmp/charge_wrapper/charge_wrapper.sock");
 
         execve(argv[1], args, nullptr);
     }
