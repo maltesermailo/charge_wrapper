@@ -140,12 +140,15 @@ int main(int argc, char** argv) {
         struct sock_filter filter[] = {
                 X86_64_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
 
-                /* mkdir() triggers notification to user-space supervisor */
+                /* all syscalls except read() and write() triggers notification to user-space supervisor */
 
-                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_mkdir, 0, 1),
+                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write, 3, 0),
+                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 2, 0),
+                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 1, 0),
+
                 BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
 
-                /* Every other system call is allowed */
+                /* Auxiliary system call is allowed */
 
                 BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
         };
@@ -163,8 +166,6 @@ int main(int argc, char** argv) {
         std::cout << "Sending notify descriptor to supervisor" << std::endl;
 
         std::cout << "Socket " << datafd << ",  notify " << notifyFd << std::endl;
-
-        sleep(1);
 
         //Send file descriptor
         ret = sendfd(datafd, notifyFd);
