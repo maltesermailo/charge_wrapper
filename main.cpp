@@ -162,13 +162,25 @@ int main(int argc, char** argv) {
 
         std::cout << "Sending notify descriptor to supervisor" << std::endl;
 
-        sleep(10);
+        std::cout << "Socket " << datafd << ",  notify " << notifyFd << std::endl;
+
+        sleep(1);
 
         //Send file descriptor
-        sendfd(sockfd, notifyFd);
+        ret = sendfd(datafd, notifyFd);
+
+        if(ret != 0) {
+            perror("SENDFD");
+
+            unlink("/tmp/charge_wrapper/charge_wrapper.sock");
+
+            exit(EXIT_FAILURE);
+        }
 
         //Start the program
-        char** args = static_cast<char **>(malloc(argc * sizeof(char *)));
+        char** args = static_cast<char **>(malloc((argc-1) * sizeof(char *)));
+
+        args[0] = argv[1];
 
         for(int i = 2; i < argc; i++) {
             int j = i - 1;
@@ -183,7 +195,15 @@ int main(int argc, char** argv) {
         close(sockfd);
         unlink("/tmp/charge_wrapper/charge_wrapper.sock");
 
-        execve(argv[1], args, nullptr);
+        int result = execve(argv[1], args, nullptr);
+
+        std::cout << "Execve failed with error " << result << std::endl;
+
+        int err = errno;
+
+        std::cout << "Errno: " << err << std::endl;
+
+        exit(EXIT_FAILURE);
     }
 
     return 0;
