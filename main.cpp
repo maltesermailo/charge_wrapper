@@ -22,6 +22,13 @@
                BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, X32_SYSCALL_BIT, 0, 1), \
                BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS)
 
+#define ARM_CHECK_ARCH_AND_LOAD_SYSCALL_NR \
+               BPF_STMT(BPF_LD | BPF_W | BPF_ABS, \
+                        (offsetof(struct seccomp_data, arch))), \
+               BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_AARCH64, 1, 0), \
+               BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS)
+
+
 #define ARRAY_SIZE(arr)  (sizeof(arr) / sizeof((arr)[0]))
 
 static int
@@ -138,7 +145,11 @@ int main(int argc, char** argv) {
         }
 
         struct sock_filter filter[] = {
+#ifdef __aarch64__
+                ARM_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
+#else
                 X86_64_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
+#endif
 
                 /* all syscalls except read() and write() triggers notification to user-space supervisor */
 
