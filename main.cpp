@@ -26,7 +26,10 @@
                BPF_STMT(BPF_LD | BPF_W | BPF_ABS, \
                         (offsetof(struct seccomp_data, arch))), \
                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_AARCH64, 1, 0), \
-               BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS)
+               BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS), \
+               BPF_STMT(BPF_LD | BPF_W | BPF_ABS, \
+                        (offsetof(struct seccomp_data, nr)))
+
 
 
 #define ARRAY_SIZE(arr)  (sizeof(arr) / sizeof((arr)[0]))
@@ -157,7 +160,7 @@ int main(int argc, char** argv) {
                 BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 2, 0),
                 BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 1, 0),
 
-                BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
+                BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
 
                 /* Auxiliary system call is allowed */
 
