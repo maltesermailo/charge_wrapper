@@ -89,20 +89,8 @@ sendfd(int sockfd, int fd)
     return 0;
 }
 
-void cleanup(int signal) {
-    std::cout << "Cleanup..." << std::endl;
-    unlink("/tmp/charge_wrapper/charge_wrapper.sock");
-
-    exit(0);
-}
-
 int main(int argc, char** argv) {
     std::cout << "Starting wrapper!" << std::endl;
-
-    signal(SIGTERM, cleanup);
-    signal(SIGKILL, cleanup);
-    signal(SIGABRT, cleanup);
-    signal(SIGINT, cleanup);
 
     for(int i = 0; i < argc; i++) {
         std::cout << argv[i] << std::endl;
@@ -122,104 +110,89 @@ int main(int argc, char** argv) {
 
     std::filesystem::create_directories("/tmp/charge_wrapper/");
 
-    int ret = bind(sockfd, reinterpret_cast<const struct sockaddr *>(&sockaddr), sizeof(sockaddr_un));
+    int ret = connect(sockfd, reinterpret_cast<const struct sockaddr *>(&sockaddr), sizeof(sockaddr_un));
 
     if(ret == -1) {
-        perror("Couldn't bind socket");
+        perror("Couldn't connect to socket");
         exit(EXIT_FAILURE);
     }
 
-    ret = listen(sockfd, 0);
+    std::cout << "Got socket. Now setting no priv flag..." << std::endl;
 
-    std::cout <<"Now waiting for socket connection..." << std::endl;
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
+        perror("prctl");
+        exit(EXIT_FAILURE);
+    }
 
-    while(true) {
-        int datafd = accept(sockfd, NULL, NULL);
-
-        if(datafd == -1) {
-            continue;
-        }
-
-        std::cout << "Got socket. Now setting no priv flag..." << std::endl;
-
-        if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
-            perror("prctl");
-            exit(EXIT_FAILURE);
-        }
-
-        struct sock_filter filter[] = {
+    struct sock_filter filter[] = {
 #ifdef __aarch64__
-                ARM_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
+            ARM_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
 #else
-                X86_64_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
+            X86_64_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
 #endif
 
-                /* all syscalls except read() and write() triggers notification to user-space supervisor */
+            /* all syscalls except read() and write() triggers notification to user-space supervisor */
 
-                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write, 3, 0),
-                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 2, 0),
-                BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 1, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write, 3, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 2, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 1, 0),
 
-                BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
+            BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
 
-                /* Auxiliary system call is allowed */
+            /* Auxiliary system call is allowed */
 
-                BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-        };
+            BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
 
-        struct sock_fprog prog = {
-                .len = ARRAY_SIZE(filter),
-                .filter = filter,
-        };
+    struct sock_fprog prog = {
+            .len = ARRAY_SIZE(filter),
+            .filter = filter,
+    };
 
-        std::cout << "Applying seccomp filter..." << std::endl;
+    std::cout << "Applying seccomp filter..." << std::endl;
 
-        //Apply seccomp filter
-        int notifyFd = syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER, &prog);
+    //Apply seccomp filter
+    int notifyFd = syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER, &prog);
 
-        std::cout << "Sending notify descriptor to supervisor" << std::endl;
+    std::cout << "Sending notify descriptor to supervisor" << std::endl;
 
-        std::cout << "Socket " << datafd << ",  notify " << notifyFd << std::endl;
+    std::cout << "Socket " << sockfd << ",  notify " << notifyFd << std::endl;
 
-        //Send file descriptor
-        ret = sendfd(datafd, notifyFd);
+    //Send file descriptor
+    ret = sendfd(sockfd, notifyFd);
 
-        if(ret != 0) {
-            perror("SENDFD");
-
-            unlink("/tmp/charge_wrapper/charge_wrapper.sock");
-
-            exit(EXIT_FAILURE);
-        }
-
-        //Start the program
-        char** args = static_cast<char **>(malloc((argc-1) * sizeof(char *)));
-
-        args[0] = argv[1];
-
-        for(int i = 2; i < argc; i++) {
-            int j = i - 1;
-
-            args[j] = argv[i];
-        }
-
-        std::cout << "Executing program... " << argv[1] << std::endl;
-
-        //Close all open resoureces before executing new program.
-        close(notifyFd);
-        close(sockfd);
-        unlink("/tmp/charge_wrapper/charge_wrapper.sock");
-
-        int result = execve(argv[1], args, nullptr);
-
-        std::cout << "Execve failed with error " << result << std::endl;
-
-        int err = errno;
-
-        std::cout << "Errno: " << err << std::endl;
+    if(ret != 0) {
+        perror("SENDFD");
 
         exit(EXIT_FAILURE);
     }
+
+    //Start the program
+    char** args = static_cast<char **>(malloc((argc-1) * sizeof(char *)));
+
+    args[0] = argv[1];
+
+    for(int i = 2; i < argc; i++) {
+        int j = i - 1;
+
+        args[j] = argv[i];
+    }
+
+    std::cout << "Executing program... " << argv[1] << std::endl;
+
+    //Close all open resoureces before executing new program.
+    close(notifyFd);
+    close(sockfd);
+
+    int result = execve(argv[1], args, nullptr);
+
+    std::cout << "Execve failed with error " << result << std::endl;
+
+    int err = errno;
+
+    std::cout << "Errno: " << err << std::endl;
+
+    exit(EXIT_FAILURE);
 
     return 0;
 }
