@@ -133,9 +133,10 @@ int main(int argc, char** argv) {
 
             /* all syscalls except read() and write() triggers notification to user-space supervisor */
 
-            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write, 3, 0),
-            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 2, 0),
-            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 1, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write, 4, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 3, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 2, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_getpid, 1, 0),
 
             BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
 
