@@ -66,7 +66,7 @@ sendfd(int sockfd, int fd)
     msgh.msg_iovlen = 1;
     iov.iov_base = &data;
     iov.iov_len = sizeof(int);
-    data = 12345;
+    data = getpid();
 
     /* Set 'msghdr' fields that describe ancillary data */
 
