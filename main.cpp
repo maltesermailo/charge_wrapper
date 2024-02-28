@@ -37,7 +37,7 @@
 static int
 sendfd(int sockfd, int fd)
 {
-    int             data;
+    pid_t             data;
     struct iovec    iov;
     struct msghdr   msgh;
     struct cmsghdr  *cmsgp;
@@ -65,7 +65,7 @@ sendfd(int sockfd, int fd)
     msgh.msg_iov = &iov;
     msgh.msg_iovlen = 1;
     iov.iov_base = &data;
-    iov.iov_len = sizeof(int);
+    iov.iov_len = sizeof(pid_t);
     data = getpid();
 
     /* Set 'msghdr' fields that describe ancillary data */
