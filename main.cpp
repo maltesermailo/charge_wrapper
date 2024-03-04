@@ -131,12 +131,13 @@ int main(int argc, char** argv) {
             X86_64_CHECK_ARCH_AND_LOAD_SYSCALL_NR,
 #endif
 
-            /* all syscalls except read() and write() triggers notification to user-space supervisor */
+            /* all syscalls except read(), write(), sendmsg(), getpid() and execve() triggers notification to user-space supervisor */
 
-            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write, 4, 0),
-            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 3, 0),
-            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 2, 0),
-            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_getpid, 1, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write, 5, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read, 4, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_sendmsg, 3, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_getpid, 2, 0),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_execve, 1, 0),
 
             BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
 
