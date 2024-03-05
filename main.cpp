@@ -157,6 +157,7 @@ int main(int argc, char** argv) {
     int notifyFd = syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER, &prog);
 
     std::cout << "Sending notify descriptor to supervisor" << std::endl;
+    std::cout << "My PID: " << getpid() << std::endl;
 
     std::cout << "Socket " << sockfd << ",  notify " << notifyFd << std::endl;
 
