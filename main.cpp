@@ -169,6 +169,9 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
+    std::cout << "Press enter to continue." << std::endl;
+    std::cin.get();
+
     //Start the program
     char** args = static_cast<char **>(malloc((argc-1) * sizeof(char *)));
 
